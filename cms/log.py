@@ -54,7 +54,9 @@ import sys
 import json
 
 import gevent.coros
-import requests
+
+
+import grequests as requests
 
 from cmscommon.terminal import colors, add_color_to_string, has_color_support
 
@@ -120,11 +122,10 @@ class MetricHandler(logging.Handler):
             )
             normal_logger = logging.getLogger()
             normal_logger.warning(metric_data_string)
-            response = requests.post(
+            requests.send(requests.post(
                 url=self.metric_server,
                 data=metric_data_string,
-            )
-            normal_logger.warning(response)
+            ))
         except KeyError:
             pass
         except:

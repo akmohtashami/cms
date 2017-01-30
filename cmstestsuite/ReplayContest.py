@@ -52,7 +52,7 @@ from mechanize import Browser
 from threading import Thread, RLock
 
 from cms import config, utf8_decoder
-from cmscontrib.ContestImporter import ContestImporter
+#from cmscontrib.ContestImporter import ContestImporter
 from cmstestsuite.web.CWSRequests import \
     LoginRequest, SubmitRequest, TokenRequest
 
@@ -89,10 +89,10 @@ class ContestReplayer(object):
         self.speed_lock = RLock()
         self.events = []
 
-        self.importer = ContestImporter(drop=False,
-                                        import_source=import_source,
-                                        only_files=False, no_files=False,
-                                        no_submissions=True)
+        #self.importer = ContestImporter(drop=False,
+        #                                import_source=import_source,
+        #                                only_files=False, no_files=False,
+        #                                no_submissions=True)
 
     def run(self):
         """Main routine for replaying a contest, handling arguments from
@@ -141,30 +141,33 @@ class ContestReplayer(object):
                     self.recompute_start(new_speed)
         return 0
 
-    def compute_events(self, contest):
-        tasks = dict((task["name"], task["num"]) for task in contest["tasks"])
+    def compute_events(self, json):
+        contest = json["0"]
+        tasks = dict((task, json[task]["num"]) for task in contest["tasks"])
         for user in contest["users"]:
-            tasks_num = dict((task["name"], 1) for task in contest["tasks"])
+            user = json[user]
+            tasks_num = dict((task, 1) for task in contest["tasks"])
             for submission in sorted(user["submissions"],
-                                     key=lambda x: x["timestamp"]):
+                                     key=lambda x: json[x]["timestamp"]):
+                submission = json[submission]
                 num = tasks_num[submission["task"]]
                 tasks_num[submission["task"]] += 1
                 self.events.append([
                     submission["timestamp"] - contest["start"],
-                    user["username"],
-                    user["password"],
+                    json[user["user"]]["username"],
+                    json[user["user"]]["password"],
                     tasks[submission["task"]],
-                    submission["task"],
+                    json[submission["task"]]["name"],
                     "s",  # For submit events.
-                    (submission["files"], submission["language"]),
+                    ([json[f] for a, f in submission["files"].iteritems()], submission["language"]),
                     ])
                 if submission["token"] is not None:
                     self.events.append([
-                        submission["token"]["timestamp"] - contest["start"],
-                        user["username"],
+                        json[submission["token"]]["timestamp"] - contest["start"],
+                        json[user["user"]]["username"],
                         user["password"],
                         tasks[submission["task"]],
-                        submission["task"],
+                        json[submission["task"]]["name"],
                         "t",  # For token events.
                         num,
                         ])
@@ -209,6 +212,7 @@ class ContestReplayer(object):
         # correct name. Otherwise, SubmissionRequest does not know how
         # to interpret the file (and which language are they in).
         temp_dir = tempfile.mkdtemp(dir=config.temp_dir)
+        submission_format = [file_["filename"] for file_ in files]
         for file_ in files:
             temp_filename = os.path.join(temp_dir,
                                          file_["filename"].replace("%l",
@@ -226,7 +230,8 @@ class ContestReplayer(object):
                      base_url=self.cws_address).execute()
         SubmitRequest(browser,
                       (int(t_id), t_short),
-                      filename=filename,
+                      filenames=[file_["filename"] for file_ in files],
+                      submission_format=submission_format, 
                       base_url=self.cws_address).execute()
         shutil.rmtree(temp_dir)
 
