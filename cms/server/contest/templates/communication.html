@@ -4,6 +4,33 @@
 
 {% from cms import config %}
 
+
+<!-- jQuery -->
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+
+<!-- keyboard widget css & script -->
+<link href="{{url_root}}/static/keyboard/css/keyboard.css" rel="stylesheet">
+<script src="{{url_root}}/static/keyboard/js/jquery.keyboard.js"></script>
+
+<!-- css for the preview keyset extension -->
+<link href="{{url_root}}/static/keyboard/css/keyboard-previewkeyset.css" rel="stylesheet">
+
+<!-- keyboard optional extensions - include ALL (includes mousewheel) -->
+<script src="{{url_root}}/static/keyboard/js/jquery.keyboard.extension-all.js"></script>
+
+<!-- jQuery & jQuery UI + theme (required) -->
+<link href="{{url_root}}/static/keyboard/docs/css/jquery-ui.min.css" rel="stylesheet">
+<script src="{{url_root}}/static/keyboard/docs/js/jquery-ui.min.js"></script>
+<script src="{{url_root}}/static/keyboard/docs/js/bootstrap.min.js"></script>
+
+<!-- keyboard extensions (optional) -->
+<script src="{{url_root}}/static/keyboard/js/jquery.mousewheel.js"></script>
+<script src="{{url_root}}/static/keyboard/js/jquery.keyboard.extension-typing.js"></script>
+<script src="{{url_root}}/static/keyboard/js/jquery.keyboard.extension-previewkeyset.js"></script>
+
+<!-- preloaded keyboard layout -->
+<script src="{{url_root}}/static/keyboard/layouts/keyboard-layouts-microsoft.js" charset="utf-8"></script>
+
 <div class="page-header">
     <h1>{{ _("Communication") }}</h1>
 </div>
@@ -48,15 +75,222 @@
                 </div>
             </div>
             <div class="control-group">
-                <label class="control-label" for="input_text">{{ _("Text") }}</label>
+                <label class="control-label" for="input_txt">{{ _("Text") }}</label>
                 <div class="controls">
-                    <textarea id="input_text" class="input-xlarge" name="question_text" rows="5" maxlength="2000"></textarea>
+                    <textarea id="input_txt" type="text" class="input-xlarge" name="question_text" rows="5" maxlength="2000"></textarea>
                 </div>
             </div>
             <div class="control-group">
                 <div class="controls">
                     <button type="submit" class="btn btn-primary">{{ _("Ask question") }}</button>
                     <button type="reset" class="btn">{{ _("Reset") }}</button>
+                    <button class="btn open" type="button"  style="float: right;">{{ _("Open Keyboard") }}</button>
+				            <select class="form-control" id="mslang" style="float: right;">
+                      <option value="ms-Albanian">Albanian</option>
+                      <option value="ms-Arabic (101)">Arabic (101)</option>
+                      <option value="ms-Arabic (102)">Arabic (102)</option>
+                      <option value="ms-Arabic (102) AZERTY">Arabic (102) AZERTY</option>
+                      <option value="ms-Armenian Eastern">Armenian Eastern</option>
+                      <option value="ms-Armenian Western">Armenian Western</option>
+                      <option value="ms-Assamese-INSCRIPT">Assamese-INSCRIPT</option>
+                      <option value="ms-Azeri Cyrillic">Azeri Cyrillic</option>
+                      <option value="ms-Azeri Latin">Azeri Latin</option>
+                      <option value="ms-Bashkir">Bashkir</option>
+                      <option value="ms-Belarusian">Belarusian</option>
+                      <option value="ms-Belgian (Comma)">Belgian (Comma)</option>
+                      <option value="ms-Belgian French">Belgian French</option>
+                      <option value="ms-Bengali">Bengali</option>
+                      <option value="ms-Bengali - INSCRIPT (Legacy)">Bengali - INSCRIPT (Legacy)</option>
+                      <option value="ms-Bosnian (Cyrillic)">Bosnian (Cyrillic)</option>
+                      <option value="ms-Bulgarian (Phonetic Traditional)">Bulgarian (Phonetic Traditional)</option>
+                      <option value="ms-Bulgarian (Phonetic)">Bulgarian (Phonetic)</option>
+                      <option value="ms-Bulgarian (Typewriter)">Bulgarian (Typewriter)</option>
+                      <option value="ms-Canadian French">Canadian French</option>
+                      <option value="ms-Canadian French (Legacy)">Canadian French (Legacy)</option>
+                      <option value="ms-Canadian Multilingual Standard">Canadian Multilingual Standard</option>
+                      <option value="ms-Chinese Bopomofo IME">Chinese Bopomofo IME</option>
+                      <option value="ms-Chinese ChaJei IME">Chinese ChaJei IME</option>
+                      <option value="ms-Czech">Czech</option>
+                      <option value="ms-Czech (QWERTY)">Czech (QWERTY)</option>
+                      <option value="ms-Czech Programmers">Czech Programmers</option>
+                      <option value="ms-Danish">Danish</option>
+                      <option value="ms-Devanagari - INSCRIPT">Devanagari - INSCRIPT</option>
+                      <option value="ms-Divehi Phonetic">Divehi Phonetic</option>
+                      <option value="ms-Divehi Typewriter">Divehi Typewriter</option>
+                      <option value="ms-Dutch">Dutch</option>
+                      <option value="ms-Estonian">Estonian</option>
+                      <option value="ms-Faroese">Faroese</option>
+                      <option value="ms-Finnish">Finnish</option>
+                      <option value="ms-French">French</option>
+                      <option value="ms-Gaelic">Gaelic</option>
+                      <option value="ms-Georgian">Georgian</option>
+                      <option value="ms-Georgian (Ergonomic)">Georgian (Ergonomic)</option>
+                      <option value="ms-Georgian (QWERTY)">Georgian (QWERTY)</option>
+                      <option value="ms-German">German</option>
+                      <option value="ms-German (IBM)">German (IBM)</option>
+                      <option value="ms-Greek">Greek</option>
+                      <option value="ms-Greek (220)">Greek (220)</option>
+                      <option value="ms-Greek (220) Latin">Greek (220) Latin</option>
+                      <option value="ms-Greek (319)">Greek (319)</option>
+                      <option value="ms-Greek (319) Latin">Greek (319) Latin</option>
+                      <option value="ms-Greek Latin">Greek Latin</option>
+                      <option value="ms-Greek Polytonic">Greek Polytonic</option>
+                      <option value="ms-Greenlandic">Greenlandic</option>
+                      <option value="ms-Gujarati">Gujarati</option>
+                      <option value="ms-Hausa">Hausa</option>
+                      <option value="ms-Hebrew">Hebrew</option>
+                      <option value="ms-Hindi Traditional">Hindi Traditional</option>
+                      <option value="ms-Hungarian">Hungarian</option>
+                      <option value="ms-Hungarian 101-key">Hungarian 101-key</option>
+                      <option value="ms-Icelandic">Icelandic</option>
+                      <option value="ms-Igbo">Igbo</option>
+                      <option value="ms-Inuktitut - Latin">Inuktitut - Latin</option>
+                      <option value="ms-Inuktitut - Naqittaut">Inuktitut - Naqittaut</option>
+                      <option value="ms-Irish">Irish</option>
+                      <option value="ms-Italian">Italian</option>
+                      <option value="ms-Italian (142)">Italian (142)</option>
+                      <option value="ms-Japanese Hiragana">Japanese Hiragana</option>
+                      <option value="ms-Kannada">Kannada</option>
+                      <option value="ms-Kazakh">Kazakh</option>
+                      <option value="ms-Korean">Korean</option>
+                      <option value="ms-Kyrgyz Cyrillic">Kyrgyz Cyrillic</option>
+                      <option value="ms-Lao">Lao</option>
+                      <option value="ms-Latin American">Latin American</option>
+                      <option value="ms-Latvian">Latvian</option>
+                      <option value="ms-Latvian (QWERTY)">Latvian (QWERTY)</option>
+                      <option value="ms-Lithuanian">Lithuanian</option>
+                      <option value="ms-Lithuanian IBM">Lithuanian IBM</option>
+                      <option value="ms-Lithuanian Standard">Lithuanian Standard</option>
+                      <option value="ms-Luxembourgish">Luxembourgish</option>
+                      <option value="ms-Macedonian (FYROM)">Macedonian (FYROM)</option>
+                      <option value="ms-Macedonian (FYROM) - Standard">Macedonian (FYROM) - Standard</option>
+                      <option value="ms-Malayalam">Malayalam</option>
+                      <option value="ms-Maltese 47-Key">Maltese 47-Key</option>
+                      <option value="ms-Maltese 48-Key">Maltese 48-Key</option>
+                      <option value="ms-Maori">Maori</option>
+                      <option value="ms-Marathi">Marathi</option>
+                      <option value="ms-Mongolian (Mongolian Script)">Mongolian (Mongolian Script)</option>
+                      <option value="ms-Mongolian Cyrillic">Mongolian Cyrillic</option>
+                      <option value="ms-Nepali">Nepali</option>
+                      <option value="ms-Norwegian">Norwegian</option>
+                      <option value="ms-Norwegian with Sami">Norwegian with Sami</option>
+                      <option value="ms-Oriya">Oriya</option>
+                      <option value="ms-Pashto (Afghanistan)">Pashto (Afghanistan)</option>
+                      <option value="ms-Persian">Persian</option>
+                      <option value="ms-Polish (214)">Polish (214)</option>
+                      <option value="ms-Polish (Programmers)">Polish (Programmers)</option>
+                      <option value="ms-Portuguese">Portuguese</option>
+                      <option value="ms-Portuguese (Brazilian ABNT)">Portuguese (Brazilian ABNT)</option>
+                      <option value="ms-Punjabi">Punjabi</option>
+                      <option value="ms-Romanian (Legacy)">Romanian (Legacy)</option>
+                      <option value="ms-Romanian (Programmers)">Romanian (Programmers)</option>
+                      <option value="ms-Romanian (Standard)">Romanian (Standard)</option>
+                      <option value="ms-Russian">Russian</option>
+                      <option value="ms-Russian (Typewriter)">Russian (Typewriter)</option>
+                      <option value="ms-Sami Extended Finland-Sweden">Sami Extended Finland-Sweden</option>
+                      <option value="ms-Sami Extended Norway">Sami Extended Norway</option>
+                      <option value="ms-Serbian (Latin)">Serbian (Latin)</option>
+                      <option value="ms-Setswana">Setswana</option>
+                      <option value="ms-Setswana (Sesotho sa Leboa)">Setswana (Sesotho sa Leboa)</option>
+                      <option value="ms-Sinhala">Sinhala</option>
+                      <option value="ms-Sinhala - Wij 9">Sinhala - Wij 9</option>
+                      <option value="ms-Slovak">Slovak</option>
+                      <option value="ms-Slovak (QWERTY)">Slovak (QWERTY)</option>
+                      <option value="ms-Slovenian">Slovenian</option>
+                      <option value="ms-Sorbian Extended">Sorbian Extended</option>
+                      <option value="ms-Sorbian Standard">Sorbian Standard</option>
+                      <option value="ms-Sorbian Standard (Legacy)">Sorbian Standard (Legacy)</option>
+                      <option value="ms-Spanish">Spanish</option>
+                      <option value="ms-Spanish Variation">Spanish Variation</option>
+                      <option value="ms-Swedish">Swedish</option>
+                      <option value="ms-Swedish with Sami">Swedish with Sami</option>
+                      <option value="ms-Swiss German">Swiss German</option>
+                      <option value="ms-Syriac">Syriac</option>
+                      <option value="ms-Syriac Phonetic">Syriac Phonetic</option>
+                      <option value="ms-Tajik">Tajik</option>
+                      <option value="ms-Tamil">Tamil</option>
+                      <option value="ms-Tatar">Tatar</option>
+                      <option value="ms-Telugu">Telugu</option>
+                      <option value="ms-Thai Kedmanee">Thai Kedmanee</option>
+                      <option value="ms-Thai Kedmanee (non-ShiftLock)">Thai Kedmanee (non-ShiftLock)</option>
+                      <option value="ms-Thai Pattachote">Thai Pattachote</option>
+                      <option value="ms-Thai Pattachote (non-ShiftLock)">Thai Pattachote (non-ShiftLock)</option>
+                      <option value="ms-Tibetan (PRC)">Tibetan (PRC)</option>
+                      <option value="ms-Turkish F">Turkish F</option>
+                      <option value="ms-Turkish Q">Turkish Q</option>
+                      <option value="ms-Turkmen">Turkmen</option>
+                      <option value="ms-US English (IBM Arabic 238_L)">US English (IBM Arabic 238_L)</option>
+                      <option value="ms-US English (Latin)">US English (Latin)</option>
+                      <option value="ms-US-Dvorak">US-Dvorak</option>
+                      <option value="ms-US-Dvorak for left hand">US-Dvorak for left hand</option>
+                      <option value="ms-US-Dvorak for right hand">US-Dvorak for right hand</option>
+                      <option value="ms-US-International" selected="selected">US-International</option>
+                      <option value="ms-Ukrainian">Ukrainian</option>
+                      <option value="ms-Ukrainian (Enhanced)">Ukrainian (Enhanced)</option>
+                      <option value="ms-United Kingdom">United Kingdom</option>
+                      <option value="ms-United Kingdom Extended">United Kingdom Extended</option>
+                      <option value="ms-Urdu">Urdu</option>
+                      <option value="ms-Uyghur">Uyghur</option>
+                      <option value="ms-Uyghur (Legacy)">Uyghur (Legacy)</option>
+                      <option value="ms-Uzbek Cyrillic">Uzbek Cyrillic</option>
+                      <option value="ms-Vietnamese">Vietnamese</option>
+                      <option value="ms-Wolof">Wolof</option>
+                      <option value="ms-Yakut">Yakut</option>
+                      <option value="ms-Yoruba">Yoruba</option>
+                      <option value="ms-Serbian (Cyrillic)">Serbian (Cyrillic)</option>
+                    </select>
+                    <script>
+                      $(function(){
+
+                        var t,
+                          o = '',
+                          layouts = [];
+
+                        // Change display language, if the definitions are available
+                        showKb = function(layout){
+                          var kb = $('#input_txt').getkeyboard();
+                          kb.options.layout = layout;
+                          // redraw keyboard with new layout
+                          kb.redraw();
+                        };
+
+                        $.each(jQuery.keyboard.layouts, function(i, l){
+                          if (l.name) {
+                            layouts.push([i,l.name]);
+                          }
+                        });
+                        // sort select options by language name, not
+                        layouts.sort( function( a, b ) {
+                          return a[1] > b[1] ? 1 : a[1] < b[1] ? -1 : 0;
+                        });
+                        $.each(layouts, function(i, l){
+                          o += '<option value="' + l[0] + '">' + l[1] + '</option>';
+                        });
+
+                        $('#input_txt').keyboard({
+                          layout: 'qwerty',
+                          usePreview : false,
+                          autoAccept : true,
+                          autoAcceptOnEsc : true,
+                          openOn : '',
+                          css : {
+                            input : 'form-control input-sm',
+                          }
+                        })
+                        // activate the typing extension
+                        .addTyping({
+                          showTyping: true,
+                          delay: 200
+                        })
+                        .previewKeyset();
+
+                        $('button.open').click(function(){
+                          var kb = $('#input_txt');
+                          showKb( $('#mslang').val() );
+                        });
+
+                      });
+                    </script>
                 </div>
             </div>
         </fieldset>

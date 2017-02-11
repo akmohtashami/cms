@@ -1,3 +1,6 @@
 [submodule "isolate"]
 	path = isolate
 	url = https://github.com/cms-dev/isolate.git
+[submodule "cms/server/static/keyboard"]
+	path = cms/server/static/keyboard
+	url = https://github.com/Mottie/Keyboard.git
