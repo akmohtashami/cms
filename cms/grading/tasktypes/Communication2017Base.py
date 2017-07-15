@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 
 # Contest Management System - http://cms-dev.github.io/
-# Copyright © 2010-2015 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
+# Copyright © 2010-2012 Giovanni Mascellani <mascellani@poisson.phc.unipi.it>
 # Copyright © 2010-2017 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2012-2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
-# Copyright © 2017 Myungwoo Chun <mc.tamaki@gmail.com>
-# Copyright © 2017 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
+# Copyright © 2016 Masaki Hara <ackie.h.gmai@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -27,17 +26,23 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
+import os
+import tempfile
 
-from cms.grading import compilation_step, evaluation_step, \
+from cms import config
+from cms.grading.Sandbox import wait_without_std, Sandbox
+from cms.grading import compilation_step, \
     human_evaluation_message, is_evaluation_passed, extract_outcome_and_text, \
-    white_diff_step
+    evaluation_step, evaluation_step_before_run, evaluation_step_after_run, \
+    merge_evaluation_results, white_diff_step
 from cms.grading.languagemanager import \
     LANGUAGES, HEADER_EXTS, SOURCE_EXTS, OBJECT_EXTS, get_language
-from cms.grading.ParameterTypes import ParameterTypeCollection, \
-    ParameterTypeChoice, ParameterTypeString
+from cms.grading.ParameterTypes import ParameterTypeInt, ParameterTypeChoice
 from cms.grading.TaskType import TaskType, \
     create_sandbox, delete_sandbox
 from cms.db import Executable
+from cms.grading.tasktypes.Batch import Batch
+from cms.io.GeventUtils import rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -48,51 +53,30 @@ def N_(message):
     return message
 
 
-class Batch(TaskType):
-    """Task type class for a unique standalone submission source, with
-    comparator (or not).
+class Communication2017Base(TaskType):
+    """Task type class for tasks that requires:
 
-    Parameters needs to be a list of three elements.
+    - a *manager* that reads the input file, work out the perfect
+      solution on its own, and communicate the input (maybe with some
+      modifications) on its standard output; it then reads the
+      response of the user's solution from the standard input and
+      write the outcome;
 
-    The first element is 'grader' or 'alone': in the first
-    case, the source file is to be compiled with a provided piece of
-    software ('grader'); in the other by itself.
-
-    The second element is a 2-tuple of the input file name and output file
-    name. The input file may be '' to denote stdin, and similarly the
-    output filename may be '' to denote stdout.
-
-    The third element is 'diff' or 'comparator' and says whether the
-    output is compared with a simple diff algorithm or using a
-    comparator.
-
-    Note: the first element is used only in the compilation step; the
-    others only in the evaluation step.
-
-    A comparator can read argv[1], argv[2], argv[3] (respectively,
-    input, correct output and user output) and should write the
-    outcome to stdout and the text to stderr.
+    - a *stub* that compiles with the user's source, reads from
+      standard input what the manager says, and write back the user's
+      solution to stdout.
 
     """
     ALLOW_PARTIAL_SUBMISSION = False
 
     SUBMISSION_PAGE_MESSAGE = ""
 
-    _COMPILATION = ParameterTypeChoice(
-        "Compilation",
-        "compilation",
-        "",
-        {"alone": "Submissions are self-sufficient",
-         "grader": "Submissions are compiled with a grader"})
+    name = "Communication"
 
-    _USE_FILE = ParameterTypeCollection(
-        "I/O (blank for stdin/stdout)",
-        "io",
-        "",
-        [
-            ParameterTypeString("Input file", "inputfile", ""),
-            ParameterTypeString("Output file", "outputfile", ""),
-        ])
+    _NUM_PROCESSES = ParameterTypeInt(
+        "Number of Processes",
+        "num_processes",
+        "")
 
     _EVALUATION = ParameterTypeChoice(
         "Output evaluation",
@@ -101,29 +85,24 @@ class Batch(TaskType):
         {"diff": "Outputs compared with white diff",
          "comparator": "Outputs are compared by a comparator"})
 
-    ACCEPTED_PARAMETERS = [_COMPILATION, _USE_FILE, _EVALUATION]
-
-    @property
-    def name(self):
-        """See TaskType.name."""
-        # TODO add some details if a grader/comparator is used, etc...
-        return "Batch"
+    ACCEPTED_PARAMETERS = [_NUM_PROCESSES, _EVALUATION]
 
     def get_compilation_commands(self, submission_format):
         """See TaskType.get_compilation_commands."""
-        source_filenames = []
-        # If a grader is specified, we add to the command line (and to
-        # the files to get) the corresponding manager.
-        if self._uses_grader():
-            source_filenames.append("grader.%l")
-        source_filenames.append(submission_format[0])
-        executable_filename = submission_format[0].replace(".%l", "")
         res = dict()
         for language in LANGUAGES:
-            res[language.name] = language.get_compilation_commands(
-                [source.replace(".%l", language.source_extension)
-                 for source in source_filenames],
-                executable_filename)
+            source_ext = language.source_extension
+            source_filenames = []
+            source_filenames.append("grader%s" % source_ext)
+            executable_filename = \
+                "_".join(pattern.replace(".%l", "")
+                         for pattern in submission_format)
+            for filename in submission_format:
+                source_filename = filename.replace(".%l", source_ext)
+                source_filenames.append(source_filename)
+            commands = language.get_compilation_commands(
+                source_filenames, executable_filename)
+            res[language.name] = commands
         return res
 
     def get_user_managers(self, unused_submission_format):
@@ -134,29 +113,14 @@ class Batch(TaskType):
         """See TaskType.get_auto_managers."""
         return None
 
-    def _uses_grader(self):
-        return self.parameters[0] == "grader"
-
     def compile(self, job, file_cacher):
         """See TaskType.compile."""
+
         # Detect the submission's language. The checks about the
         # formal correctedness of the submission are done in CWS,
         # before accepting it.
         language = get_language(job.language)
         source_ext = language.source_extension
-
-        # TODO: here we are sure that submission.files are the same as
-        # task.submission_format. The following check shouldn't be
-        # here, but in the definition of the task, since this actually
-        # checks that task's task type and submission format agree.
-        if len(job.files) != 1:
-            job.success = True
-            job.compilation_success = False
-            job.text = [N_("Invalid files in submission")]
-            job.plus = {}
-            logger.error("Submission contains %d files, expecting 1",
-                         len(job.files), extra={"operation": job.info})
-            return True
 
         # Create the sandbox
         sandbox = create_sandbox(file_cacher, job.multithreaded_sandbox)
@@ -164,18 +128,16 @@ class Batch(TaskType):
 
         # Prepare the source files in the sandbox
         files_to_get = {}
-        format_filename = job.files.keys()[0]
         source_filenames = []
-        source_filenames.append(format_filename.replace(".%l", source_ext))
-        files_to_get[source_filenames[0]] = \
-            job.files[format_filename].digest
-        # If a grader is specified, we add to the command line (and to
-        # the files to get) the corresponding manager. The grader must
-        # be the first file in source_filenames.
-        if self._uses_grader():
-            source_filenames.insert(0, "grader%s" % source_ext)
-            files_to_get["grader%s" % source_ext] = \
-                job.managers["grader%s" % source_ext].digest
+        # Stub.
+        stub_filename = "grader%s" % source_ext
+        source_filenames.append(stub_filename)
+        files_to_get[stub_filename] = job.managers[stub_filename].digest
+        # User's submission.
+        for filename, fileinfo in job.files.iteritems():
+            source_filename = filename.replace(".%l", source_ext)
+            source_filenames.append(source_filename)
+            files_to_get[source_filename] = fileinfo.digest
 
         # Also copy all managers that might be useful during compilation.
         for filename in job.managers.iterkeys():
@@ -193,7 +155,9 @@ class Batch(TaskType):
             sandbox.create_file_from_storage(filename, digest)
 
         # Prepare the compilation command
-        executable_filename = format_filename.replace(".%l", "")
+        executable_filename = \
+            "_".join(pattern.replace(".%l", "")
+                     for pattern in job.files.keys())
         commands = language.get_compilation_commands(
             source_filenames, executable_filename)
 
@@ -219,73 +183,129 @@ class Batch(TaskType):
 
     def evaluate(self, job, file_cacher):
         """See TaskType.evaluate."""
-        # Create the sandbox
-        sandbox = create_sandbox(file_cacher, job.multithreaded_sandbox)
 
-        # Prepare the execution
-        executable_filename = job.executables.keys()[0]
+        if len(self.parameters) <= 0:
+            num_processes = 1
+        else:
+            num_processes = self.parameters[0]
+        indices = range(num_processes)
+        # Create sandboxes and FIFOs
+        sandbox_mgr = create_sandbox(file_cacher, job.multithreaded_sandbox)
+        sandbox_user = [create_sandbox(file_cacher, job.multithreaded_sandbox)
+                        for i in indices]
+        fifo_dir = [tempfile.mkdtemp(dir=config.temp_dir) for i in indices]
+        fifo_in = [os.path.join(fifo_dir[i], "in%d" % i) for i in indices]
+        fifo_out = [os.path.join(fifo_dir[i], "out%d" % i) for i in indices]
+        for i in indices:
+            os.mkfifo(fifo_in[i])
+            os.mkfifo(fifo_out[i])
+            os.chmod(fifo_dir[i], 0o755)
+            os.chmod(fifo_in[i], 0o666)
+            os.chmod(fifo_out[i], 0o666)
+
+        # First step: we start the manager.
+        manager_filename = "manager"
+        manager_command = ["./%s" % manager_filename]
+        for i in indices:
+            manager_command.append(fifo_in[i])
+            manager_command.append(fifo_out[i])
+        manager_executables_to_get = {
+            manager_filename:
+            job.managers[manager_filename].digest
+            }
+        manager_files_to_get = {
+            "input.txt": job.input
+            }
+        manager_allow_dirs = fifo_dir
+        for filename, digest in manager_executables_to_get.iteritems():
+            sandbox_mgr.create_file_from_storage(
+                filename, digest, executable=True)
+        for filename, digest in manager_files_to_get.iteritems():
+            sandbox_mgr.create_file_from_storage(filename, digest)
+        manager = evaluation_step_before_run(
+            sandbox_mgr,
+            manager_command,
+            num_processes * job.time_limit,
+            0,
+            allow_dirs=manager_allow_dirs,
+            writable_files=["output.txt"],
+            stdin_redirect="input.txt",
+            stdout_redirect="output.txt",
+        )
+
+        # Second step: we start the user submission compiled with the
+        # stub.
         language = get_language(job.language)
-        commands = language.get_evaluation_commands(
-            executable_filename,
-            main="grader" if self._uses_grader() else executable_filename)
+        executable_filename = job.executables.keys()[0]
         executables_to_get = {
             executable_filename:
             job.executables[executable_filename].digest
             }
-        input_filename, output_filename = self.parameters[1]
-        stdin_redirect = None
-        stdout_redirect = None
-        files_allowing_write = []
-        if input_filename == "":
-            input_filename = "input.txt"
-            stdin_redirect = input_filename
-        if output_filename == "":
-            output_filename = "output.txt"
-            stdout_redirect = output_filename
-        else:
-            files_allowing_write.append(output_filename)
-        files_to_get = {
-            input_filename: job.input
-            }
+        processes = [None for i in indices]
+        for i in indices:
+            args = [fifo_out[i], fifo_in[i]]
+            if num_processes != 1:
+                args.append(str(i))
+            commands = language.get_evaluation_commands(
+                executable_filename,
+                main="grader",
+                args=args)
+            user_allow_dirs = [fifo_dir[i]]
+            for filename, digest in executables_to_get.iteritems():
+                sandbox_user[i].create_file_from_storage(
+                    filename, digest, executable=True)
+            # Assumes that the actual execution of the user solution
+            # is the last command in commands, and that the previous
+            # are "setup" that doesn't need tight control.
+            if len(commands) > 1:
+                evaluation_step(sandbox_user[i], commands[:-1], 10, 256)
+            processes[i] = evaluation_step_before_run(
+                sandbox_user[i],
+                commands[-1],
+                job.time_limit,
+                job.memory_limit,
+                allow_dirs=user_allow_dirs)
 
-        # Put the required files into the sandbox
-        for filename, digest in executables_to_get.iteritems():
-            sandbox.create_file_from_storage(filename, digest, executable=True)
-        for filename, digest in files_to_get.iteritems():
-            sandbox.create_file_from_storage(filename, digest)
+        # Consume output.
+        wait_without_std(processes + [manager])
+        # TODO: check exit codes with translate_box_exitcode.
 
-        # Actually performs the execution
-        success, plus = evaluation_step(
-            sandbox,
-            commands,
-            job.time_limit,
-            job.memory_limit,
-            writable_files=files_allowing_write,
-            stdin_redirect=stdin_redirect,
-            stdout_redirect=stdout_redirect)
+        user_results = [evaluation_step_after_run(s) for s in sandbox_user]
+        success_user = all(r[0] for r in user_results)
+        plus_user = reduce(merge_evaluation_results,
+                           [r[1] for r in user_results])
+        success_mgr, unused_plus_mgr = \
+            evaluation_step_after_run(sandbox_mgr)
 
-        job.sandboxes = [sandbox.path]
-        job.plus = plus
+        if plus_user['exit_status'] == Sandbox.EXIT_OK and \
+                plus_user["execution_time"] >= job.time_limit:
+            plus_user['exit_status'] = Sandbox.EXIT_TIMEOUT
 
-        outcome = None
-        text = None
+        # Merge results.
+        job.sandboxes = [s.path for s in sandbox_user] + [sandbox_mgr.path]
+        job.plus = plus_user
 
-        # Error in the sandbox: nothing to do!
-        if not success:
-            pass
-
-        # Contestant's error: the marks won't be good
-        elif not is_evaluation_passed(plus):
-            outcome = 0.0
-            text = human_evaluation_message(plus)
+        # If at least one evaluation had problems, we report the
+        # problems.
+        if not success_user or not success_mgr:
+            success, outcome, text = False, None, None
+        # If the user sandbox detected some problem (timeout, ...),
+        # the outcome is 0.0 and the text describes that problem.
+        elif not is_evaluation_passed(plus_user):
+            success = True
+            outcome, text = 0.0, human_evaluation_message(plus_user)
             if job.get_output:
                 job.user_output = None
-
-        # Otherwise, advance to checking the solution
+        # Otherwise, we use the manager to obtain the outcome.
         else:
+            success = True
+            outcome = None
+            text = None
 
+            input_filename = "input.txt"
+            output_filename = "output.txt"
             # Check that the output file was created
-            if not sandbox.file_exists(output_filename):
+            if not sandbox_mgr.file_exists(output_filename):
                 outcome = 0.0
                 text = [N_("Evaluation didn't produce file %s"),
                         output_filename]
@@ -295,7 +315,7 @@ class Batch(TaskType):
             else:
                 # If asked so, put the output file into the storage
                 if job.get_output:
-                    job.user_output = sandbox.get_file_to_storage(
+                    job.user_output = sandbox_mgr.get_file_to_storage(
                         output_filename,
                         "Output file in job %s" % job.info,
                         trunc_len=100 * 1024)
@@ -310,17 +330,17 @@ class Batch(TaskType):
                 else:
 
                     # Put the reference solution into the sandbox
-                    sandbox.create_file_from_storage(
+                    sandbox_mgr.create_file_from_storage(
                         "res.txt",
                         job.output)
 
                     # Check the solution with white_diff
-                    if self.parameters[2] == "diff":
+                    if self.parameters[1] == "diff":
                         outcome, text = white_diff_step(
-                            sandbox, output_filename, "res.txt")
+                            sandbox_mgr, output_filename, "res.txt")
 
                     # Check the solution with a comparator
-                    elif self.parameters[2] == "comparator":
+                    elif self.parameters[1] == "comparator":
                         manager_filename = "checker"
 
                         if manager_filename not in job.managers:
@@ -331,7 +351,7 @@ class Batch(TaskType):
                             success = False
 
                         else:
-                            sandbox.create_file_from_storage(
+                            sandbox_mgr.create_file_from_storage(
                                 manager_filename,
                                 job.managers[manager_filename].digest,
                                 executable=True)
@@ -344,13 +364,13 @@ class Batch(TaskType):
                             # files already existing in the sandbox,
                             # we try removing the file first.
                             try:
-                                sandbox.remove_file(input_filename)
+                                sandbox_mgr.remove_file(input_filename)
                             except OSError as e:
                                 # Let us be extra sure that the file
                                 # was actually removed and we did not
                                 # mess up with permissions.
-                                assert not sandbox.file_exists(input_filename)
-                            sandbox.create_file_from_storage(
+                                assert not sandbox_mgr.file_exists(input_filename)
+                            sandbox_mgr.create_file_from_storage(
                                 input_filename,
                                 job.input)
 
@@ -358,25 +378,25 @@ class Batch(TaskType):
                             # one may want to write a bash checker who calls
                             # other processes). Set to a high number because
                             # to avoid fork-bombing the worker.
-                            sandbox.max_processes = 1000
+                            sandbox_mgr.max_processes = 1000
 
                             success, _ = evaluation_step(
-                                sandbox,
+                                sandbox_mgr,
                                 [["./%s" % manager_filename,
                                   input_filename, "res.txt", output_filename]])
                         if success:
                             try:
                                 outcome, text = \
-                                    extract_outcome_and_text(sandbox)
-                            except ValueError, e:
+                                    extract_outcome_and_text(sandbox_mgr)
+                            except ValueError as e:
                                 logger.error("Invalid output from "
                                              "comparator: %s", e.message,
                                              extra={"operation": job.info})
                                 success = False
 
                     else:
-                        raise ValueError("Unrecognized third parameter"
-                                         " `%s' for Batch tasktype." %
+                        raise ValueError("Unrecognized second parameter"
+                                         " `%s' for Communication tasktype." %
                                          self.parameters[2])
 
         # Whatever happened, we conclude.
@@ -384,4 +404,9 @@ class Batch(TaskType):
         job.outcome = "%s" % outcome if outcome is not None else None
         job.text = text
 
-        delete_sandbox(sandbox, job.success)
+        delete_sandbox(sandbox_mgr, job.success)
+        for s in sandbox_user:
+            delete_sandbox(s, job.success)
+        if not config.keep_sandbox:
+            for d in fifo_dir:
+                rmtree(d)

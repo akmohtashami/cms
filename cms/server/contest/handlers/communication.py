@@ -10,6 +10,7 @@
 # Copyright © 2014 Artem Iglikov <artem.iglikov@gmail.com>
 # Copyright © 2014 Fabian Gundlach <320pointsguy@gmail.com>
 # Copyright © 2015-2016 William Di Luigi <williamdiluigi@gmail.com>
+# Copyright © 2017 Peyman Jabbarzade Ganje <peyman.jabarzade@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -32,7 +33,14 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from cms import config
+
 import logging
+import os
+import subprocess
 
 import tornado.web
 
@@ -43,6 +51,34 @@ from .contest import ContestHandler, NOTIFICATION_ERROR, NOTIFICATION_SUCCESS
 
 
 logger = logging.getLogger(__name__)
+
+
+def send_mail(subject, message, recipients):
+    Sender = "{} <{}>".format(config.email_sender, config.email_address)
+    SMTP_Server = config.email_server
+    SMTP_User = config.email_username
+    SMTP_Pass = config.email_password
+
+    if isinstance(recipients, str):
+        recipients = [recipients]
+
+    text_subtype = 'html'
+    msg = MIMEMultipart()
+    msg['From'] = Sender
+    msg['To'] = ",".join(recipients)
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(message, text_subtype))
+    mailserver = smtplib.SMTP(SMTP_Server, 587)
+    mailserver.ehlo()
+    # secure email with tls encryption
+    mailserver.starttls()
+    # re-identify as an encrypted connection
+    mailserver.ehlo()
+    mailserver.login(SMTP_User, SMTP_Pass)
+    mailserver.sendmail(Sender, recipients, msg.as_string())
+    mailserver.quit()
+    logger.info('Email sent to %s', ",".join(recipients))
 
 
 class CommunicationHandler(ContestHandler):
@@ -97,6 +133,9 @@ class QuestionHandler(ContestHandler):
         logger.info(
             "Question submitted by user %s.", participation.user.username)
 
+        if config.email_notification:
+            send_mail('New Question Received', 'Please Check CMS.', config.email_notification)
+
         # Add "All ok" notification.
         self.application.service.add_notification(
             participation.user.username,
@@ -105,5 +144,51 @@ class QuestionHandler(ContestHandler):
             self._("Your question has been received, you will be "
                    "notified when it is answered."),
             NOTIFICATION_SUCCESS)
+
+        self.redirect(fallback_page)
+
+
+class CallHandler(ContestHandler):
+    """Called when the user Call staff.
+
+    """
+    @tornado.web.authenticated
+    @multi_contest
+    def get(self):
+        self.set_secure_cookie(self.contest.name + "_unread_count", "0")
+        self.render("call_a_staff.html", **self.r_params)
+
+    def post(self):
+        # User can post only if we want.
+        if not self.contest.allow_questions:
+            raise tornado.web.HTTPError(404)
+
+        participation = self.current_user
+        fallback_page = self.url("callstaff")
+        request_type = self.get_argument("request_type", "")
+        additional_comment = self.get_argument("comment_text", "")
+
+        try:
+            subprocess.check_call(['StaffRequest',
+                                   request_type, additional_comment,
+                                   str(participation.ip)])
+        except Exception as e:
+            self.application.service.add_notification(
+                participation.user.username,
+                self.timestamp,
+                self._("System failed"),
+                self._("The system has failed to deliver your request. "
+                       "Please raise your hand for contacting staffs."),
+                NOTIFICATION_ERROR)
+            logger.error(e, exc_info=e)
+        else:
+            self.application.service.add_notification(
+                participation.user.username,
+                self.timestamp,
+                self._("Request received"),
+                self._("Your request has been received "
+                       "and staffs have been informed. Please wait "
+                       "until a staff reaches you for further guidance."),
+                NOTIFICATION_SUCCESS)
 
         self.redirect(fallback_page)

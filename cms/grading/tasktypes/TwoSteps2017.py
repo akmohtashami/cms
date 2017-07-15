@@ -7,6 +7,7 @@
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2012-2013 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 # Copyright © 2016 Petar Veličković <pv273@cam.ac.uk>
+# Copyright © 2017 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -40,7 +41,7 @@ from cms.grading.languagemanager import LANGUAGES, get_language
 from cms.grading.TaskType import TaskType, \
     create_sandbox, delete_sandbox
 from cms.db import Executable
-
+from cms.grading.tasktypes.Batch import Batch
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ def N_(message):
     return message
 
 
-class TwoSteps(TaskType):
+class TwoSteps2017(TaskType):
     """Task type class for tasks where the user must submit two files
     with a function each; the first function compute some data, that
     get passed to the second function that must recover some data.
@@ -99,12 +100,10 @@ class TwoSteps(TaskType):
             header_ext = language.header_extension
             source_filenames = []
             # Manager
-            manager_source_filename = "manager%s" % source_ext
+            manager_source_filename = "grader%s" % source_ext
             source_filenames.append(manager_source_filename)
             # Manager's header.
-            if header_ext is not None:
-                manager_header_filename = "manager%s" % header_ext
-                source_filenames.append(manager_header_filename)
+
 
             for filename in submission_format:
                 source_filename = filename.replace(".%l", source_ext)
@@ -126,6 +125,8 @@ class TwoSteps(TaskType):
         # Detect the submission's language. The checks about the
         # formal correctedness of the submission are done in CWS,
         # before accepting it.
+        if "user test" in job.info:
+            return Batch(parameters=["grader", ("", ""), self.parameters[0]]).compile(job, file_cacher)
         language = get_language(job.language)
         source_ext = language.source_extension
         header_ext = language.header_extension
@@ -134,9 +135,10 @@ class TwoSteps(TaskType):
         # task.submission_format. The following check shouldn't be
         # here, but in the definition of the task, since this actually
         # checks that task's task type and submission format agree.
-        if len(job.files) != 2:
+        if len(job.files) != 1:
             job.success = True
             job.compilation_success = False
+            job.plus = {}
             job.text = [N_("Invalid files in submission")]
             logger.error("Submission contains %d files, expecting 2",
                          len(job.files), extra={"operation": job.info})
@@ -150,16 +152,11 @@ class TwoSteps(TaskType):
         source_filenames = []
 
         # Manager.
-        manager_filename = "manager%s" % source_ext
+        manager_filename = "grader%s" % source_ext
         source_filenames.append(manager_filename)
         files_to_get[manager_filename] = \
             job.managers[manager_filename].digest
-        # Manager's header.
-        if header_ext is not None:
-            manager_filename = "manager%s" % header_ext
-            source_filenames.append(manager_filename)
-            files_to_get[manager_filename] = \
-                job.managers[manager_filename].digest
+
 
         # User's submissions and headers.
         for filename, file_ in job.files.iteritems():
@@ -202,6 +199,8 @@ class TwoSteps(TaskType):
     def evaluate(self, job, file_cacher):
         """See TaskType.evaluate."""
         # f stand for first, s for second.
+        if "user test" in job.info:
+            return Batch(parameters=["grader", ("", ""), self.parameters[0]]).evaluate(job, file_cacher)
         first_sandbox = create_sandbox(file_cacher, job.multithreaded_sandbox)
         second_sandbox = create_sandbox(file_cacher, job.multithreaded_sandbox)
         fifo_dir = tempfile.mkdtemp(dir=config.temp_dir)
@@ -210,9 +209,19 @@ class TwoSteps(TaskType):
         os.chmod(fifo_dir, 0o755)
         os.chmod(fifo, 0o666)
 
+        language = get_language(job.language)
         # First step: we start the first manager.
         first_filename = "manager"
-        first_command = ["./%s" % first_filename, "0", fifo]
+        first_command = language.get_evaluation_commands(
+            first_filename, main="grader", args=["0", fifo])
+        if len(first_command) > 1:
+            job.success = False
+            logger.error("Language contains %d commands for "
+                         "evaluation, expecting 1",
+                         len(first_command), extra={"operation": job.info})
+            return
+        else:
+            first_command = first_command[0]
         first_executables_to_get = {
             first_filename:
             job.executables[first_filename].digest
@@ -240,8 +249,17 @@ class TwoSteps(TaskType):
             wait=False)
 
         # Second step: we start the second manager.
+
         second_filename = "manager"
-        second_command = ["./%s" % second_filename, "1", fifo]
+        second_command = language.get_evaluation_commands(
+            second_filename, main="grader", args=["1", fifo])
+        if len(second_command) > 1:
+            job.success = False
+            logger.error("Language contains %d commands for "
+                         "evaluation, expecting 1",
+                         len(second_command), extra={"operation": job.info})
+            return
+        second_command = second_command[0]
         second_executables_to_get = {
             second_filename:
             job.executables[second_filename].digest
@@ -328,7 +346,7 @@ class TwoSteps(TaskType):
                             second_sandbox, "output.txt", "res.txt")
 
                     elif self.parameters[0] == "comparator":
-                        if TwoSteps.CHECKER_FILENAME not in job.managers:
+                        if TwoSteps2017.CHECKER_FILENAME not in job.managers:
                             logger.error("Configuration error: missing or "
                                          "invalid comparator (it must be "
                                          "named `checker')",
@@ -336,8 +354,8 @@ class TwoSteps(TaskType):
                             success = False
                         else:
                             second_sandbox.create_file_from_storage(
-                                TwoSteps.CHECKER_FILENAME,
-                                job.managers[TwoSteps.CHECKER_FILENAME].digest,
+                                TwoSteps2017.CHECKER_FILENAME,
+                                job.managers[TwoSteps2017.CHECKER_FILENAME].digest,
                                 executable=True)
                             # Rewrite input file, as in Batch.py
                             try:
@@ -350,8 +368,10 @@ class TwoSteps(TaskType):
                                 job.input)
                             success, _ = evaluation_step(
                                 second_sandbox,
-                                [["./%s" % TwoSteps.CHECKER_FILENAME,
-                                  "input.txt", "res.txt", "output.txt"]])
+                                [["./%s" % TwoSteps2017.CHECKER_FILENAME,
+                                  "input.txt", "res.txt", "output.txt"]],
+                                allow_dirs=second_allow_path
+                            )
                             if success:
                                 try:
                                     outcome, text = extract_outcome_and_text(
@@ -376,7 +396,7 @@ class TwoSteps(TaskType):
 
     def get_user_managers(self, unused_submission_format):
         """See TaskType.get_user_managers."""
-        return ["manager.%l"]
+        return ["grader.%l"]
 
     def get_auto_managers(self):
         return None

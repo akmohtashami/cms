@@ -3,6 +3,7 @@
 
 # Contest Management System - http://cms-dev.github.io/
 # Copyright © 2011-2016 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2017 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -333,7 +334,8 @@ class ImageHandler(object):
         'png': 'image/png',
         'jpg': 'image/jpeg',
         'gif': 'image/gif',
-        'bmp': 'image/bmp'
+        'bmp': 'image/bmp',
+        'svg': 'image/svg+xml',
     }
 
     MIME_TO_EXT = dict((v, k) for k, v in EXT_TO_MIME.iteritems())
@@ -356,6 +358,8 @@ class ImageHandler(object):
             endpoint, args = route.match()
         except HTTPException as exc:
             return exc
+
+        args["name"] = os.path.splitext(args["name"])[0]
 
         location = self.location % args
 
@@ -489,6 +493,10 @@ def main():
                 os.path.join(config.web_dir, 'img', 'face.png')),
             '/flags': ImageHandler(
                 os.path.join(config.lib_dir, 'flags', '%(name)s'),
+                os.path.join(config.web_dir, 'img', 'flag.png')),
+            '/flags/thumbnails': ImageHandler(
+                os.path.join(config.lib_dir, 'flags', 'thumbnails',
+                             '%(name)s'),
                 os.path.join(config.web_dir, 'img', 'flag.png')),
         }), {'/': config.web_dir})
 

@@ -11,6 +11,7 @@
 # Copyright © 2014 Fabian Gundlach <320pointsguy@gmail.com>
 # Copyright © 2015-2016 William Di Luigi <williamdiluigi@gmail.com>
 # Copyright © 2016 Myungwoo Chun <mc.tamaki@gmail.com>
+# Copyright © 2017 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -43,9 +44,10 @@ import tornado.web
 
 from sqlalchemy import func
 
-from cms import config
+from cms import config, random_service
 from cms.db import Task, UserTest, UserTestFile, UserTestManager
-from cms.grading.languagemanager import get_language
+from cms.grading.languagemanager import get_language, filename_to_language, \
+    filename_to_language_names
 from cms.grading.tasktypes import get_task_type
 from cms.server import actual_phase_required, format_size, multi_contest
 from cmscommon.archive import Archive
@@ -231,9 +233,20 @@ class UserTestHandler(ContestHandler):
             self._send_error(self._("Tests too frequent!"), error.message)
             return
 
+        submission_lang = self.get_argument("language", None)
+
+        required_managers = [
+            name
+            for name in task_type.get_user_managers(task.submission_format)
+            if name.endswith(".%l") or
+            filename_to_language(name) is None or
+            submission_lang in filename_to_language_names(name)
+        ]
+        print(required_managers)
+
         # Required files from the user.
         required = set([sfe.filename for sfe in task.submission_format] +
-                       task_type.get_user_managers(task.submission_format) +
+                       required_managers +
                        ["input"])
 
         # Ensure that the user did not submit multiple files with the
@@ -303,7 +316,6 @@ class UserTestHandler(ContestHandler):
         # integrate it with the language fetched from the previous
         # submission (if we use it) and later make sure it is
         # recognized and allowed.
-        submission_lang = self.get_argument("language", None)
         need_lang = any(our_filename.find(".%l") != -1
                         for our_filename in files)
 
@@ -405,7 +417,7 @@ class UserTestHandler(ContestHandler):
             digest = file_digests[filename]
             self.sql_session.add(
                 UserTestFile(filename, digest, user_test=user_test))
-        for filename in task_type.get_user_managers(task.submission_format):
+        for filename in required_managers:
             digest = file_digests[filename]
             if submission_lang is not None:
                 extension = get_language(submission_lang).source_extension
@@ -415,8 +427,8 @@ class UserTestHandler(ContestHandler):
 
         self.sql_session.add(user_test)
         self.sql_session.commit()
-        self.application.service.evaluation_service.new_user_test(
-            user_test_id=user_test.id)
+        random_service(self.application.service.evaluation_services)\
+            .new_user_test(user_test_id=user_test.id)
         self.application.service.add_notification(
             participation.user.username,
             self.timestamp,
@@ -603,9 +615,10 @@ class UserTestFileHandler(FileHandler):
             stored_filename = re.sub(r'%s$' % extension, '.%l', filename)
 
         if stored_filename in user_test.files:
+
             digest = user_test.files[stored_filename].digest
-        elif stored_filename in user_test.managers:
-            digest = user_test.managers[stored_filename].digest
+        elif filename in user_test.managers:
+            digest = user_test.managers[filename].digest
         else:
             raise tornado.web.HTTPError(404)
         self.sql_session.close()

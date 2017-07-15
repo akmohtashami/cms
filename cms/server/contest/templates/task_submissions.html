@@ -2,6 +2,9 @@
 
 {% block additional_js %}
 
+{% from cms.grading.tasktypes import get_task_type %}
+{% set task_type = get_task_type(dataset=task.active_dataset) %}
+
 $(document).on("click", "#submission_list tbody tr td.status .details", function (event) {
     var submission_id = $(this).parent().parent().attr("data-submission");
     var modal = $("#submission_detail");
@@ -78,14 +81,27 @@ $(document).ready(function () {
 
 {% if actual_phase == 0 or actual_phase == 3 or current_user.unrestricted %}
 
+{% from cms.grading.scoretypes import get_score_type %}
+{% try %}
+    {% set score_type = get_score_type(dataset=task.active_dataset) %}
+{% except %}
+    {% set score_type = None %}
+{% end %}
+
 <div class="span9 task_submissions">
 
-<div class="page-header">
-    <h1>{% raw _("%(name)s (%(short_name)s) <small>submissions</small>") % {"name": escape(task.title), "short_name": escape(task.name)} %}</h1>
+<div class="page-header row">
+    <h1 class="span8">{% raw _("%(name)s (%(short_name)s) <small>submissions</small>") % {"name": escape(task.title), "short_name": escape(task.name)} %}</h1>
+{% if last_submission_result %}
+    <div class="span1 task_score {{ get_score_class(last_submission_result.task_public_score, score_type.max_public_score) }}">
+      {{ score_type.format_score(last_submission_result.task_public_score, score_type.max_public_score, last_submission_result.task_public_score_details, task.score_precision, _) }}
+    </div>
+{% end %}
 </div>
 
-
 <h2 style="margin-bottom: 10px">{{ _("Submit a solution") }}</h2>
+
+<h4>{% raw task_type.SUBMISSION_PAGE_MESSAGE %}</h4>
 
 {% if submissions_left is not None %}
     <div class="span5">
@@ -117,7 +133,7 @@ $(document).ready(function () {
 {% for lang in contest.languages %}
                             <option value="{{ lang }}">{{ lang }}</option>
 {% end %}
-                        <select>
+                        </select>
                     </div>
                 </div>
 {% end %}
@@ -196,12 +212,6 @@ $(document).ready(function () {
 {% end %}
 
 
-{% from cms.grading.scoretypes import get_score_type %}
-{% try %}
-    {% set score_type = get_score_type(dataset=task.active_dataset) %}
-{% except %}
-    {% set score_type = None %}
-{% end %}
 
 {% from cmscommon.datetime import utc %}
 {% set show_date = any(s.timestamp.replace(tzinfo=utc).astimezone(timezone).date() != datetime.datetime.utcnow().replace(tzinfo=utc).astimezone(timezone).date() for s in submissions) %}

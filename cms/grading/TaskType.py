@@ -6,6 +6,7 @@
 # Copyright © 2010-2017 Stefano Maggiolo <s.maggiolo@gmail.com>
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2012-2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
+# Copyright © 2017 Peyman Jabbarzade Ganje <peyman.jabbarzade@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -108,6 +109,9 @@ class TaskType(object):
     # the non-provided files with the one in the previous submission.
     ALLOW_PARTIAL_SUBMISSION = False
 
+    # A message shown in top of submission page
+    SUBMISSION_PAGE_MESSAGE = ""
+
     # A list of all the accepted parameters for this task type.
     # Each item is an instance of TaskTypeParameter.
     ACCEPTED_PARAMETERS = []
@@ -181,7 +185,7 @@ class TaskType(object):
         """
         raise NotImplementedError("Please subclass this class.")
 
-    def get_user_managers(self):
+    def get_user_managers(self, unused_submission_format):
         """Return the managers that must be provided by the user when
         requesting a user test.
 

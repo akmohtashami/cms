@@ -11,7 +11,7 @@
 # Copyright © 2014 Fabian Gundlach <320pointsguy@gmail.com>
 # Copyright © 2015-2016 William Di Luigi <williamdiluigi@gmail.com>
 # Copyright © 2016 Myungwoo Chun <mc.tamaki@gmail.com>
-# Copyright © 2016 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
+# Copyright © 2016-2017 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -45,7 +45,7 @@ import tornado.web
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
-from cms import config
+from cms import config, random_service
 from cms.db import File, Submission, SubmissionResult, Task, Token
 from cms.grading.languagemanager import get_language
 from cms.grading.scoretypes import get_score_type
@@ -70,7 +70,7 @@ class SubmitHandler(ContestHandler):
 
     def _send_error(self, subject, text):
         """Shorthand for sending a notification and redirecting."""
-        logger.warning("Sent error: `%s' - `%s'", subject, text)
+        logger.info("Sent error: `%s' - `%s'", subject, text)
         self.application.service.add_notification(
             self.current_user.user.username,
             self.timestamp,
@@ -204,7 +204,9 @@ class SubmitHandler(ContestHandler):
             unpacked_dir = archive.unpack()
             for name in archive.namelist():
                 filename = os.path.basename(name)
-                body = open(os.path.join(unpacked_dir, filename), "r").read()
+                if filename not in required:
+                    continue
+                body = open(os.path.join(unpacked_dir, name), "r").read()
                 self.request.files[filename] = [{
                     'filename': filename,
                     'body': body
@@ -245,15 +247,15 @@ class SubmitHandler(ContestHandler):
         # the same programming language of the current one), and put
         # them in file_digests (since they are already in FS).
         file_digests = {}
-        if task_type.ALLOW_PARTIAL_SUBMISSION and \
-                last_submission_t is not None and \
-                (submission_lang is None or
-                 submission_lang == last_submission_t.language):
-            submission_lang = last_submission_t.language
-            for filename in required.difference(provided):
-                if filename in last_submission_t.files:
-                    file_digests[filename] = \
-                        last_submission_t.files[filename].digest
+        # if task_type.ALLOW_PARTIAL_SUBMISSION and \
+        #         last_submission_t is not None and \
+        #         (submission_lang is None or
+        #          submission_lang == last_submission_t.language):
+        #     submission_lang = last_submission_t.language
+        #     for filename in required.difference(provided):
+        #         if filename in last_submission_t.files:
+        #             file_digests[filename] = \
+        #                 last_submission_t.files[filename].digest
 
         # Throw an error if task needs a language, but we don't have
         # it or it is not allowed / recognized.
@@ -338,10 +340,26 @@ class SubmitHandler(ContestHandler):
             self.sql_session.add(File(filename, digest, submission=submission))
         self.sql_session.add(submission)
         self.sql_session.commit()
-        self.application.service.evaluation_service.new_submission(
-            submission_id=submission.id)
+
+        # Store some data out of the session so we can close it before issuing
+        # RPCs.
+        username = participation.user.username
+        submission_id = submission.id
+        logger.metric(
+            "submission_added",
+            submission_id=submission.id,
+            language=submission.language,
+            task_id=task.id,
+            participant_id=participation.id,
+            value=1
+        )
+
+        self.sql_session.close()
+
+        random_service(self.application.service.evaluation_services)\
+            .new_submission(submission_id=submission_id)
         self.application.service.add_notification(
-            participation.user.username,
+            username,
             self.timestamp,
             self._("Submission received"),
             self._("Your submission has been received "
@@ -370,12 +388,22 @@ class TaskSubmissionsHandler(ContestHandler):
         except KeyError:
             raise tornado.web.HTTPError(404)
 
+        if len(task.submission_format) == 0:
+            raise tornado.web.HTTPError(404)
+
         submissions = self.sql_session.query(Submission)\
             .filter(Submission.participation == participation)\
             .filter(Submission.task == task)\
             .options(joinedload(Submission.token))\
             .options(joinedload(Submission.results))\
             .all()
+
+        last_submission_result = None
+        for submission in submissions:
+            if submission.official:
+                sr = submission.get_result(task.active_dataset)
+                if sr is not None and sr.scored():
+                    last_submission_result = sr
 
         submissions_left_contest = None
         if self.contest.max_submission_number is not None:
@@ -409,6 +437,7 @@ class TaskSubmissionsHandler(ContestHandler):
                     submissions_left=submissions_left,
                     submissions_download_allowed=
                         self.contest.submissions_download_allowed,
+                    last_submission_result=last_submission_result,
                     **self.r_params)
 
 
@@ -506,21 +535,31 @@ class SubmissionDetailsHandler(ContestHandler):
         sr = submission.get_result(task.active_dataset)
         score_type = get_score_type(dataset=task.active_dataset)
 
+        task_details = None
         details = None
         if sr is not None:
-            if submission.tokened():
+            if submission.tokened() or self.r_params["actual_phase"] >= 3:
                 details = sr.score_details
+
             else:
                 details = sr.public_score_details
+            if self.r_params["actual_phase"] >= 3:
+                task_details = sr.task_score_details
+            else:
+                task_details = sr.task_public_score_details
 
             if sr.scored():
                 details = score_type.get_html_details(details, self._)
+                task_details = score_type.\
+                    get_total_score_html_details(task_details, self._)
             else:
+                task_details = None
                 details = None
 
         self.render("submission_details.html",
                     sr=sr,
-                    details=details)
+                    details=details,
+                    task_details=task_details)
 
 
 class SubmissionFileHandler(FileHandler):

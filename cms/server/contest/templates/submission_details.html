@@ -1,6 +1,15 @@
 {% from cms.grading import format_status_text %}
 {% from cms.server import format_size %}
-
+<h3> {{ _("Task summary") }} </h3>
+{% if task_details is not None %}
+<div class="score_details">
+{% raw task_details %}
+</div>
+<span class="help-inline">
+  * {{ _("Only submissions sent before this submission are included.") }}
+</span>
+{% end %}
+<h3> {{ _("Evaluation details") }} </h3>
 {% if details is not None %}
 <div class="score_details">
 {% raw details %}

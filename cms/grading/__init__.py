@@ -9,7 +9,7 @@
 # Copyright © 2013-2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 # Copyright © 2014 Fabian Gundlach <320pointsguy@gmail.com>
 # Copyright © 2016 Myungwoo Chun <mc.tamaki@gmail.com>
-# Copyright © 2016 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
+# Copyright © 2016-2017 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -38,7 +38,7 @@ from collections import namedtuple
 
 from sqlalchemy.orm import joinedload
 
-from cms import SCORE_MODE_MAX, config
+from cms import config
 from cms.db import Submission
 from cms.grading.Sandbox import Sandbox
 
@@ -141,9 +141,9 @@ COMPILATION_MESSAGES = MessageCollection([
                     "This might be caused by an excessive use of C++ "
                     "templates, for example.")),
     HumanMessage("signal",
-                 N_("Compilation killed with signal %s (could be triggered "
+                 N_("Compilation killed (could be triggered "
                     "by violating memory limits)"),
-                 N_("Your submission was killed with the specified signal. "
+                 N_("Your submission was killed. "
                     "Among other things, this might be caused by exceeding "
                     "the memory limit for the compilation, and in turn by an "
                     "excessive use of C++ templates, for example.")),
@@ -152,14 +152,14 @@ COMPILATION_MESSAGES = MessageCollection([
 
 EVALUATION_MESSAGES = MessageCollection([
     HumanMessage("success",
-                 N_("Output is correct"),
+                 N_("Correct"),
                  N_("Your submission ran and gave the correct answer")),
     HumanMessage("partial",
-                 N_("Output is partially correct"),
+                 N_("Partially Correct"),
                  N_("Your submission ran and gave the partially correct "
                     "answer")),
     HumanMessage("wrong",
-                 N_("Output isn't correct"),
+                 N_("Wrong Answer"),
                  N_("Your submission ran, but gave the wrong answer")),
     HumanMessage("nooutput",
                  N_("Evaluation didn't produce file %s"),
@@ -176,26 +176,19 @@ EVALUATION_MESSAGES = MessageCollection([
                     "visible in the submission details might be much smaller "
                     "than the time limit.")),
     HumanMessage("signal",
-                 N_("Execution killed with signal %d (could be triggered by "
+                 N_("Run-time error (could be triggered by "
                     "violating memory limits)"),
-                 N_("Your submission was killed with the specified signal. "
+                 N_("Your submission was killed. "
                     "Among other things, this might be caused by exceeding "
-                    "the memory limit. Note that if this is the reason, "
-                    "the memory usage visible in the submission details is "
-                    "the usage before the allocation that caused the "
-                    "signal.")),
+                    "the memory limit. ")),
     HumanMessage("syscall",
-                 N_("Execution killed because of forbidden syscall %s"),
+                 N_("Security Violation; Forbidden syscall %s"),
                  N_("Your submission was killed because it tried to use "
                     "the forbidden syscall specified in the message.")),
     HumanMessage("fileaccess",
-                 N_("Execution killed because of forbidden file access"),
+                 N_("Security Violation; Forbidden file access"),
                  N_("Your submission was killed because it tried to read "
                     "or write a forbidden file.")),
-    HumanMessage("returncode",
-                 N_("Execution failed because the return code was nonzero"),
-                 N_("Your submission failed because it exited with a return "
-                    "code different from 0.")),
 ])
 
 
@@ -364,7 +357,7 @@ def compilation_step(sandbox, commands):
         success = True
         compilation_success = False
         plus["signal"] = signal
-        text = [COMPILATION_MESSAGES.get("signal").message, signal]
+        text = [COMPILATION_MESSAGES.get("signal").message]
 
     # Sandbox error: this isn't a user error, the administrator needs
     # to check the environment
@@ -596,7 +589,7 @@ def human_evaluation_message(plus):
     elif exit_status == Sandbox.EXIT_TIMEOUT_WALL:
         return [EVALUATION_MESSAGES.get("walltimeout").message]
     elif exit_status == Sandbox.EXIT_SIGNAL:
-        return [EVALUATION_MESSAGES.get("signal").message, plus['signal']]
+        return [EVALUATION_MESSAGES.get("signal").message]
     elif exit_status == Sandbox.EXIT_SANDBOX_ERROR:
         return None
     elif exit_status == Sandbox.EXIT_SYSCALL:
@@ -606,7 +599,7 @@ def human_evaluation_message(plus):
         return [EVALUATION_MESSAGES.get("fileaccess").message]
     elif exit_status == Sandbox.EXIT_NONZERO_RETURN:
         # Don't tell which code: would be too much information!
-        return [EVALUATION_MESSAGES.get("returncode").message]
+        return [EVALUATION_MESSAGES.get("signal").message]
     elif exit_status == Sandbox.EXIT_OK:
         return None
     else:
@@ -885,50 +878,11 @@ def task_score(participation, task):
 
     score = 0.0
 
-    if task.score_mode == SCORE_MODE_MAX:
-        # Like in IOI 2013-: maximum score amongst all submissions.
-
-        # The maximum score amongst all submissions (not yet computed
-        # scores count as 0.0).
-        max_score = 0.0
-
-        for s in submissions:
-            sr = s.get_result(task.active_dataset)
-            if sr is not None and sr.scored():
-                max_score = max(max_score, sr.score)
-            else:
-                partial = True
-
-        score = max_score
-    else:
-        # Like in IOI 2010-2012: maximum score among all tokened
-        # submissions and the last submission.
-
-        # The score of the last submission (if computed, otherwise 0.0).
-        last_score = 0.0
-        # The maximum score amongst the tokened submissions (not yet computed
-        # scores count as 0.0).
-        max_tokened_score = 0.0
-
-        # Last score: if the last submission is scored we use that,
-        # otherwise we use 0.0 (and mark that the score is partial
-        # when the last submission could be scored).
-        last_s = submissions[-1]
-        last_sr = last_s.get_result(task.active_dataset)
-
-        if last_sr is not None and last_sr.scored():
-            last_score = last_sr.score
-        else:
+    for s in submissions:
+        sr = s.get_result(task.active_dataset)
+        if sr is None or not sr.scored():
             partial = True
-
-        for s in submissions:
-            sr = s.get_result(task.active_dataset)
-            if s.tokened():
-                if sr is not None and sr.scored():
-                    max_tokened_score = max(max_tokened_score, sr.score)
-                else:
-                    partial = True
-
-        score = max(last_score, max_tokened_score)
+        else:
+            score = sr.task_score
 
     return score, partial

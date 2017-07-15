@@ -45,6 +45,7 @@ PACKAGE_DATA = {
     "cms.server": [
         os.path.join("static", "*.*"),
         os.path.join("static", "jq", "*.*"),
+        os.path.join("static", "icons", "*.*"),
         os.path.join("admin", "static", "*.*"),
         os.path.join("admin", "static", "jq", "*.*"),
         os.path.join("admin", "static", "sh", "*.*"),
@@ -108,6 +109,7 @@ setup(
     scripts=["scripts/cmsLogService",
              "scripts/cmsScoringService",
              "scripts/cmsEvaluationService",
+             "scripts/cmsQueueService",
              "scripts/cmsWorker",
              "scripts/cmsResourceService",
              "scripts/cmsChecker",

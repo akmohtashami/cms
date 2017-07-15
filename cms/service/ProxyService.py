@@ -9,7 +9,7 @@
 # Copyright © 2013 Bernard Blackham <bernard@largestprime.net>
 # Copyright © 2015 Luca Versari <veluca93@gmail.com>
 # Copyright © 2015 William Di Luigi <williamdiluigi@gmail.com>
-# Copyright © 2016 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
+# Copyright © 2016-2017 Amir Keivan Mohtashami <akmohtashami97@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -355,6 +355,8 @@ class ProxyService(TriggeredService):
             tasks = dict()
 
             for task in contest.tasks:
+                if len(task.submission_format) == 0:
+                    continue
                 score_type = get_score_type(dataset=task.active_dataset)
                 tasks[encode_id(task.name)] = {
                     "short_name": task.name,
@@ -401,6 +403,10 @@ class ProxyService(TriggeredService):
             subchange_data["score"] = submission_result.score
             subchange_data["extra"] = \
                 json.loads(submission_result.ranking_score_details)
+            if submission_result.task_score is not None:
+                subchange_data["task_score"] = submission_result.task_score
+                subchange_data["task_extra"] = \
+                    json.loads(submission_result.task_ranking_score_details)
 
         self.scores_sent_to_rankings.add(submission.id)
 
