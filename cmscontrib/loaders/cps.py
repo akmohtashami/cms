@@ -210,6 +210,12 @@ class CpsTaskLoader(TaskLoader):
 
         # Graders
         graders_dir = os.path.join(self.path, 'graders')
+
+        if data['task_type'] == 'TwoSteps':
+            pas_manager = os.path.join(graders_dir, data['name'] + 'lib.pas')
+            if not os.path.exists(pas_manager):
+                os.system('touch %s' % pas_manager)
+
         graders_list = \
             [filename for filename in os.listdir(graders_dir) if filename != 'manager.cpp']
         for grader_name in graders_list:
