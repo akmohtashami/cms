@@ -7,6 +7,7 @@
 # Copyright © 2010-2012 Matteo Boscariol <boscarim@hotmail.com>
 # Copyright © 2012-2014 Luca Wehrstedt <luca.wehrstedt@gmail.com>
 # Copyright © 2016 Masaki Hara <ackie.h.gmai@gmail.com>
+# Copyright © 2017 Peyman Jabbarzade Ganje <peyman.jabarzade@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -68,7 +69,7 @@ class Communication(TaskType):
     """
     ALLOW_PARTIAL_SUBMISSION = False
 
-    name = "Communication"
+    name = "Batch"
 
     _NUM_PROCESSES = ParameterTypeInt(
         "Number of Processes",
