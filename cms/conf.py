@@ -106,7 +106,7 @@ class Config(object):
         self.num_proxies_used = None
         self.max_submission_length = 100000
         self.max_input_length = 5000000
-        self.stl_path = "/usr/share/doc/stl-manual/html/"
+        self.stl_path = "/opt/cppref/reference/"
         # Prefix of 'iso-codes'[1] installation. It can be found out
         # using `pkg-config --variable=prefix iso-codes`, but it's
         # almost universally the same (i.e. '/usr') so it's hardly
