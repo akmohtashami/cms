@@ -149,6 +149,10 @@ class Config(object):
         self.admin_listen_port = 8889
         self.admin_cookie_duration = 10 * 60 * 60  # 10 hours
 
+        # APIWebServer.
+        self.api_listen_address = ""
+        self.api_listen_port = 8897
+
         # ProxyService.
         self.rankings = ["http://usern4me:passw0rd@localhost:8890/"]
         self.https_certfile = None

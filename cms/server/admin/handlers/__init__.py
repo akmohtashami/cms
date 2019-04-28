@@ -109,7 +109,6 @@ from .usertest import \
     UserTestHandler, \
     UserTestFileHandler
 
-
 HANDLERS = [
     (r"/", OverviewHandler),
     (r"/login", LoginHandler),

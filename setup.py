@@ -11,6 +11,7 @@
 # Copyright © 2016 Myungwoo Chun <mc.tamaki@gmail.com>
 # Copyright © 2016 Masaki Hara <ackie.h.gmai@gmail.com>
 # Copyright © 2016 Peyman Jabbarzade Ganje <peyman.jabarzade@gmail.com>
+# Copyright © 2017 Kiarash Golezardi <kiarashgolezardi@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -61,6 +62,7 @@ PACKAGE_DATA = {
         os.path.join("contest", "static", "img", "mimetypes", "*.*"),
         os.path.join("contest", "static", "js", "*.*"),
         os.path.join("contest", "templates", "*.*"),
+        os.path.join("api", "templates", "*.*"),
     ],
     "cms.service": [
         os.path.join("templates", "printing", "*.*"),
@@ -135,7 +137,8 @@ setup(
              "scripts/cmsPrintingService",
              "scripts/cmsRankingWebServer",
              "scripts/cmsInitDB",
-             "scripts/cmsDropDB"],
+             "scripts/cmsDropDB",
+             "scripts/cmsAPIWebServer"],
     entry_points={
         "console_scripts": [
             "cmsRunTests=cmstestsuite.RunTests:main",

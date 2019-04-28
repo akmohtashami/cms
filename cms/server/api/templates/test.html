@@ -1,0 +1,32 @@
+{% extends base.html %}
+
+{% block core %}
+{% from cms.server import format_dataset_attrs %}
+{% from cms import plugin_list, SCORE_MODE_MAX_TOKENED_LAST, SCORE_MODE_MAX %}
+
+<form method="post" action="../test" enctype="multipart/form-data" >
+    <input type="file" name="input"/>
+    <select name="operation" >
+        <option value="encode">Encode</option>
+        <option value="log">Log</option>
+    </select>
+    <input type="submit" value="Sumbit" />
+</form>
+
+<br><br><br>
+
+<form method="post" action="../task/simple/testcases/add" >
+    Codename: <input type="text" name="testcase_id"/><br>
+    Input file: <input type="text" name="input" /><br>
+    <input type="submit" value="Sumbit" />
+</form>
+
+<br><br><br>
+
+<form method="post" action="../task/simple/testcase/TC1/run" >
+    Files: <input type="text" name="files" /> For example: '{'simple.%l': 'things'}' <br>
+    Language: <input type="text" name="language" /> For example: 'C++11 / g++' <br>
+    <input type="submit" value="Submit" />
+</form>
+
+{% end %}
