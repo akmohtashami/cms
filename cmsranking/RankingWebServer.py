@@ -403,57 +403,57 @@ class ImageHandler:
         return self.wsgi_app(environ, start_response)
 
     @responder
-def wsgi_app(self, environ, start_response):
-    route = self.router.bind_to_environ(environ)
-    try:
-        endpoint, args = route.match()
-    except HTTPException as exc:
-        return exc
+    def wsgi_app(self, environ, start_response):
+        route = self.router.bind_to_environ(environ)
+        try:
+            endpoint, args = route.match()
+        except HTTPException as exc:
+            return exc
 
-    location = self.location % args
-    request = Request(environ)
-    request.encoding_errors = "strict"
+        location = self.location % args
+        request = Request(environ)
+        request.encoding_errors = "strict"
 
-    # Determine which path to serve
-    path = None
-    
-    if os.path.isfile(location):
-        # Exact path exists, check if extension is supported
-        _, ext = os.path.splitext(location)
-        ext = ext.lstrip('.')
-        if ext in self.EXT_TO_MIME:
-            path = location
-            mimetype = self.EXT_TO_MIME[ext]
-
-    if path is None:
-        # Check available extensions
-        available: list[str] = list()
-        for extension, mimetype in self.EXT_TO_MIME.items():
-            if os.path.isfile(location + '.' + extension):
-                available.append(mimetype)
+        # Determine which path to serve
+        path = None
         
-        mimetype = request.accept_mimetypes.best_match(available)
-        if mimetype is not None:
-            path = "%s.%s" % (location, self.MIME_TO_EXT[mimetype])
-        else:
-            path = self.fallback
-            mimetype = 'image/png'  # FIXME Hardcoded type.
+        if os.path.isfile(location):
+            # Exact path exists, check if extension is supported
+            _, ext = os.path.splitext(location)
+            ext = ext.lstrip('.')
+            if ext in self.EXT_TO_MIME:
+                path = location
+                mimetype = self.EXT_TO_MIME[ext]
 
-    # Serve the file
-    response = Response()
-    response.status_code = 200
-    response.mimetype = mimetype
-    
-    response.last_modified = \
-        datetime.utcfromtimestamp(os.path.getmtime(path))\
-                .replace(microsecond=0)
+        if path is None:
+            # Check available extensions
+            available: list[str] = list()
+            for extension, mimetype in self.EXT_TO_MIME.items():
+                if os.path.isfile(location + '.' + extension):
+                    available.append(mimetype)
+            
+            mimetype = request.accept_mimetypes.best_match(available)
+            if mimetype is not None:
+                path = "%s.%s" % (location, self.MIME_TO_EXT[mimetype])
+            else:
+                path = self.fallback
+                mimetype = 'image/png'  # FIXME Hardcoded type.
 
-    # TODO check for If-Modified-Since and If-None-Match
+        # Serve the file
+        response = Response()
+        response.status_code = 200
+        response.mimetype = mimetype
+        
+        response.last_modified = \
+            datetime.utcfromtimestamp(os.path.getmtime(path))\
+                    .replace(microsecond=0)
 
-    response.response = wrap_file(environ, open(path, 'rb'))
-    response.direct_passthrough = True
+        # TODO check for If-Modified-Since and If-None-Match
 
-    return response
+        response.response = wrap_file(environ, open(path, 'rb'))
+        response.direct_passthrough = True
+
+        return response
 
 
 class RootHandler:
