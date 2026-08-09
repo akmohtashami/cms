@@ -339,7 +339,7 @@ class EventSource:
         else:
             one_shot = False
 
-        if one_host:
+        if one_shot:
             ping_timeout = self._ONE_SHOT_POLL_TIMEOUT
         else:
             ping_timeout = self._PING_TIMEOUT
