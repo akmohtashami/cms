@@ -522,6 +522,8 @@ class PublicConfigHandler:
 
         response = Response()
         response.status_code = 200
+        response.headers['Cache-Control'] = public_cache_control(
+            self.pub_config.cache_interval)
         response.mimetype = "application/json"
         print(str(self.pub_config))
         response.data = json.dumps(
