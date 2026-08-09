@@ -366,7 +366,7 @@ class EventSource:
         if self.retry_backoff_seconds > 0:
             # Sned how long the client should wait before retrying
             # the connection.
-            write(b"retry: {}\n".format(self.retry_backoff_seconds * 1000))
+            write("retry: {}\n".format(self.retry_backoff_seconds * 1000).encode("utf-8"))
 
         # Send some data down the pipe. We need that to make the user
         # agent announces the connection (see the spec.). Since it's a
