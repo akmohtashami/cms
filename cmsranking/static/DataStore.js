@@ -807,7 +807,7 @@ var DataStore = new function () {
 
     self.create_event_source = function () {
         if (self.last_event_id == null) {
-            self.last_event_id = (Math.round(Math.min(self.contest_init_time,
+            self.last_event_id = (Math.floor(Math.min(self.contest_init_time,
                                                       self.task_init_time,
                                                       self.team_init_time,
                                                       self.user_init_time,
@@ -884,7 +884,7 @@ var DataStore = new function () {
             if (PublicConfig.retry_backoff_seconds > 0)
                 self.reconnect_timer = setTimeout(
                     announce_disconnection_fn, 
-                    PublicConfig.retry_backoff_seconds * 2,
+                    PublicConfig.retry_backoff_seconds * 2000,
                 );
             else
                 announce_disconnection_fn();
