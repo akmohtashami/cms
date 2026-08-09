@@ -219,12 +219,13 @@ class EventSource:
 
     _CACHE_SIZE = 250
 
-    def __init__(self, retry_backoff_seconds: int = 0):
+    def __init__(self, retry_backoff_seconds: int = 0, cache_interval: int = 1):
         """Create an event source.
 
         """
         self._pub = Publisher(self._CACHE_SIZE)
         self.retry_backoff_seconds = retry_backoff_seconds
+        self.cache_interval = cache_interval
 
     def send(self, event: str, data: str):
         """Send the event to the stream.
@@ -304,22 +305,6 @@ class EventSource:
         if request.accept_mimetypes.quality("text/event-stream") <= 0:
             return NotAcceptable()(environ, start_response)
 
-        # Initialize the response and get the write() callback. The
-        # Cache-Control header is useless for conforming clients, as
-        # the spec. already imposes that behavior on them, but we set
-        # it explicitly to avoid unwanted caching by unaware proxies and
-        # middlewares.
-        write = start_response(
-            "200 OK", [("Content-Type", "text/event-stream; charset=utf-8"),
-                       ("Cache-Control", "no-cache")])
-
-        # This is a part of the fourth hack (see above).
-        if hasattr(start_response, "__self__") and \
-                isinstance(start_response.__self__, WSGIHandler):
-            handler = start_response.__self__
-        else:
-            handler = None
-
         # One-shot means that we will terminate the request after the
         # first batch of sent events. We do this when we believe the
         # client doesn't support chunked transfer. As this encoding has
@@ -333,7 +318,7 @@ class EventSource:
         # newer werkzeug version. But all modern browsers support SSE natively
         # so this check isn't necessary nowadays. (Well, the http/1.1 check
         # probably isn't necessary either, to be honest...)
-        if (environ["SERVER_PROTOCOL"] != "HTTP/1.1" or 
+        if (environ["SERVER_PROTOCOL"] != "HTTP/1.1" or
             request.headers.get("X-Response-Mode", "eventstream") == "one-shot"):
             one_shot = True
         else:
@@ -341,9 +326,26 @@ class EventSource:
 
         if one_shot:
             ping_timeout = self._ONE_SHOT_POLL_TIMEOUT
+            # Allow CDNs to reuse finished one-shot responses briefly.
+            # Empty responses can stick for at most this long.
+            max_age = max(0, self.cache_interval - 1)
+            cache_control = "public, max-age=%d" % max_age
         else:
             ping_timeout = self._PING_TIMEOUT
-            disable_poll = False
+            # Long-lived streams must not be cached by intermediaries.
+            cache_control = "no-cache"
+
+        # Initialize the response and get the write() callback.
+        write = start_response(
+            "200 OK", [("Content-Type", "text/event-stream; charset=utf-8"),
+                       ("Cache-Control", cache_control)])
+
+        # This is a part of the fourth hack (see above).
+        if hasattr(start_response, "__self__") and \
+                isinstance(start_response.__self__, WSGIHandler):
+            handler = start_response.__self__
+        else:
+            handler = None
 
         # As for the Server-Sent Events [1] spec., this is the way for
         # the client to tell us the ID of the last event it received
