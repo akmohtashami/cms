@@ -89,6 +89,214 @@ abbr {
     overflow-y: scroll;
 }
 
+#SponsorBanner {
+    position: relative;
+    margin: 12px 0 14px;
+    overflow: hidden;
+    border: 1px solid #E1E5E9;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 2px 10px rgba(22, 38, 56, 0.08);
+}
+
+#SponsorBanner::before,
+#SponsorBanner::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    z-index: 2;
+    content: "";
+    pointer-events: none;
+}
+
+#SponsorBanner::before {
+    left: 0;
+    background: linear-gradient(to right, #FFFFFF, rgba(255, 255, 255, 0));
+}
+
+#SponsorBanner::after {
+    right: 0;
+    background: linear-gradient(to left, #FFFFFF, rgba(255, 255, 255, 0));
+}
+
+.SponsorTrack {
+    display: flex;
+    width: max-content;
+    will-change: transform;
+    animation: sponsor-scroll 47s linear infinite;
+}
+
+.SponsorGroup {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 44px;
+    min-height: 72px;
+    padding: 0 18px;
+}
+
+.SponsorItem {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    height: 56px;
+}
+
+.SponsorItem--section-end {
+    padding-right: 0;
+    border-right: 0;
+}
+
+.SponsorItem img {
+    display: block;
+    width: auto;
+    max-width: none;
+    height: 42px;
+    max-height: none;
+    object-fit: contain;
+}
+
+.SponsorItem img[src*="digital.png"] {
+    height: 40px;
+}
+
+.SponsorItem img[src*="mmtv.png"],
+.SponsorItem img[src*="rtrm.png"] {
+    height: 44px;
+}
+
+.SponsorItem img[src*="ioi-original.png"] {
+    height: 38px;
+}
+
+.SponsorItem img[src*="uzum.png"] {
+    height: 36px;
+}
+
+.SponsorItem img[src*="huawei.png"] {
+    height: 36px;
+}
+
+.SponsorItem img[src*="squarepoint.png"] {
+    height: 38px;
+}
+
+.SponsorItem img[src*="ucell.png"] {
+    height: 28px;
+}
+
+.SponsorItem img[src*="nvidia.png"] {
+    height: 40px;
+}
+
+.SponsorItem img[src*="hrt.png"] {
+    height: 46px;
+    transform: translateY(2px);
+}
+
+.SponsorItem img[src*="openai-official.png"] {
+    height: 28px;
+    transform: translateY(4px);
+}
+
+.SponsorItem img[src*="cognition.png"] {
+    height: 32px;
+}
+
+.SponsorItem--named {
+    gap: 10px;
+    color: #15283B;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.SponsorItem--named img {
+    width: 38px;
+    height: 38px;
+}
+
+@keyframes sponsor-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+@media (max-width: 900px) {
+    .SponsorGroup {
+        gap: 34px;
+        min-height: 64px;
+        padding: 0 14px;
+    }
+
+    .SponsorItem {
+        height: 50px;
+    }
+
+    .SponsorItem img {
+        height: 36px;
+    }
+
+    .SponsorItem img[src*="digital.png"] {
+        height: 34px;
+    }
+
+    .SponsorItem img[src*="mmtv.png"],
+    .SponsorItem img[src*="rtrm.png"] {
+        height: 38px;
+    }
+
+    .SponsorItem img[src*="ioi-original.png"] {
+        height: 40px;
+    }
+
+    .SponsorItem img[src*="squarepoint.png"] {
+        height: 33px;
+    }
+
+    .SponsorItem img[src*="ucell.png"] {
+        height: 31px;
+    }
+
+    .SponsorItem img[src*="hrt.png"] {
+        height: 43px;
+    }
+
+    .SponsorItem img[src*="openai-official.png"] {
+        height: 31px;
+    }
+
+    .SponsorItem img[src*="cognition.png"] {
+        height: 35px;
+    }
+
+    .SponsorItem--named {
+        font-size: 15px;
+    }
+
+    .SponsorItem--named img {
+        width: 34px;
+        height: 34px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .SponsorTrack {
+        animation: none;
+    }
+
+    #SponsorBanner {
+        overflow-x: auto;
+    }
+
+    .SponsorGroup[aria-hidden="true"] {
+        display: none;
+    }
+}
+
 
 /******************************************************************************\
 |                                                                              |
